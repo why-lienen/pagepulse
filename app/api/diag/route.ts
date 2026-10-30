@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { existsSync, readdirSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { findRunner, runnerCandidates, runLocalLighthouse } from "@/lib/lighthouseLocal";
 
@@ -7,17 +8,69 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-function has(moduleName: string): boolean {
-  const roots = [process.cwd(), "/var/task", path.join(process.cwd(), ".next", "server")];
-  return roots.some((root) => existsSync(path.join(root, "node_modules", moduleName, "package.json")));
+function pkgDirs(): string[] {
+  return [path.join(process.cwd(), "node_modules"), "/var/task/node_modules", path.join(process.cwd(), ".next", "server", "node_modules")];
 }
 
-function listDir(dir: string): string[] | null {
-  try {
-    return readdirSync(dir).slice(0, 40);
-  } catch {
-    return null;
+function readPkg(name: string): Record<string, unknown> | null {
+  for (const dir of pkgDirs()) {
+    const file = path.join(dir, name, "package.json");
+    if (!existsSync(file)) continue;
+    try {
+      return JSON.parse(readFileSync(file, "utf8"));
+    } catch {
+      return null;
+    }
   }
+  return null;
+}
+
+/** Walks the dependency tree the same way Node resolves it, and reports what is missing. */
+function dependencyReport(roots: string[]) {
+  const status = new Map<string, "ok" | "missing">();
+  const walk = (name: string) => {
+    if (status.has(name)) return;
+    const pkg = readPkg(name);
+    if (!pkg) {
+      status.set(name, "missing");
+      return;
+    }
+    status.set(name, "ok");
+    const deps = (pkg.dependencies ?? {}) as Record<string, string>;
+    for (const dep of Object.keys(deps)) walk(dep);
+  };
+  for (const root of roots) walk(root);
+
+  const ok = [...status].filter(([, v]) => v === "ok").map(([k]) => k);
+  const missing = [...status].filter(([, v]) => v === "missing").map(([k]) => k);
+  return { okCount: ok.length, missing };
+}
+
+function runRaw(url: string): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  const runner = findRunner();
+  if (!runner) return Promise.resolve({ stdout: "", stderr: "runner not found", code: null });
+  return new Promise((resolve) => {
+    let stdout = "";
+    let stderr = "";
+    const child = spawn(process.execPath, [runner, url], {
+      cwd: process.cwd(),
+      env: { ...process.env, NODE_ENV: "production" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        /* gone */
+      }
+    }, 45_000);
+    child.stdout.on("data", (c: Buffer) => (stdout += c.toString()));
+    child.stderr.on("data", (c: Buffer) => (stderr += c.toString()));
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ stdout: stdout.slice(0, 4000), stderr: stderr.slice(0, 4000), code });
+    });
+  });
 }
 
 /**
@@ -27,6 +80,7 @@ function listDir(dir: string): string[] | null {
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const shouldRun = url.searchParams.get("run") === "1";
+  const raw = url.searchParams.get("raw") === "1";
   const target = url.searchParams.get("url") ?? "https://example.com/";
 
   const info: Record<string, unknown> = {
@@ -34,27 +88,26 @@ export async function GET(req: Request) {
     platform: process.platform,
     cwd: process.cwd(),
     vercel: Boolean(process.env.VERCEL),
-    runner: {
-      candidates: runnerCandidates(),
-      found: findRunner(),
-    },
-    scriptsDir: listDir(path.join(process.cwd(), "scripts")),
-    varTaskScripts: listDir("/var/task/scripts"),
-    modules: {
-      lighthouse: has("lighthouse"),
-      chromeLauncher: has("chrome-launcher"),
-      sparticuz: has("@sparticuz/chromium"),
-      undici: has("undici"),
-    },
+    runner: { candidates: runnerCandidates(), found: findRunner() },
+    scriptsDir: (() => {
+      try {
+        return readdirSync(path.join(process.cwd(), "scripts")).slice(0, 40);
+      } catch {
+        return null;
+      }
+    })(),
+    deps: dependencyReport(["lighthouse", "chrome-launcher", "@sparticuz/chromium"]),
     env: {
       disableLocal: process.env.DISABLE_LOCAL_LIGHTHOUSE ?? null,
       provider: process.env.PERF_PROVIDER ?? null,
       timeout: process.env.LIGHTHOUSE_TIMEOUT_MS ?? null,
-      chromePath: process.env.CHROME_PATH ?? null,
     },
   };
 
-  if (shouldRun) {
+  if (raw) {
+    const out = await runRaw(target);
+    info.raw = out;
+  } else if (shouldRun) {
     const started = Date.now();
     try {
       const result = await runLocalLighthouse(target);
@@ -67,11 +120,7 @@ export async function GET(req: Request) {
         ms: Date.now() - started,
       };
     } catch (err) {
-      info.run = {
-        ok: false,
-        error: err instanceof Error ? err.stack ?? err.message : String(err),
-        ms: Date.now() - started,
-      };
+      info.run = { ok: false, error: err instanceof Error ? err.stack : String(err), ms: Date.now() - started };
     }
   }
 
