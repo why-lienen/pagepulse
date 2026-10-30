@@ -154,12 +154,15 @@ Works out of the box on [Vercel](https://vercel.com):
 
 1. Push this repo to GitHub.
 2. Import it on Vercel — the default Next.js preset is correct, no build flags.
-3. Open **Settings → Functions** and set memory to **1024 MB** (`2048 MB` is more
-   comfortable; 512 MB will OOM inside Chromium).
+3. Check **Settings → Functions**: Hobby already gives you 1024 MB, which is the
+   practical minimum for Chromium. On Pro bump it to 2048 MB.
 4. Add the env vars above (optional). On the free Hobby plan also set
    `LIGHTHOUSE_TIMEOUT_MS=45000` so a slow target fails fast instead of being
    killed by the 60 s function limit.
 5. Deploy.
+
+Node **22.x** is required: `@sparticuz/chromium` 153 needs `^22.17 || >=24` and
+Lighthouse 13 needs `>=22.19`. `package.json` pins `"node": "22.x"`.
 
 The route already declares `maxDuration = 60`, which is the Hobby ceiling. On Pro
 you can raise it to `300` and drop the timeout override.
