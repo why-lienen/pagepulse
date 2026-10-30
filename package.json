@@ -1,0 +1,26 @@
+{
+  "name": "pagepulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source AI website auditor — instant performance, SEO and security report with AI-prioritised fixes.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^153.0.0",
+    "chrome-launcher": "^1.2.2",
+    "lighthouse": "^13.6.0",
+    "next": "^14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "undici": "^8.12.3"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "@types/react": "18.3.5",
+    "@types/react-dom": "18.3.0",
+    "typescript": "5.6.3"
+  }
+}
