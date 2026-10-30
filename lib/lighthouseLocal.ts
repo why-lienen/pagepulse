@@ -23,7 +23,12 @@ const EMPTY: CategoryScore[] = [
 const BEGIN = "__LH_BEGIN__";
 const END = "__LH_END__";
 
-const TIMEOUT_MS = Number(process.env.LIGHTHOUSE_TIMEOUT_MS ?? 120_000);
+/**
+ * 45 s by default: serverless functions are capped at 60 s, so a longer budget
+ * would just be killed by the platform instead of returning a readable error.
+ * A local run takes ~15 s.
+ */
+const TIMEOUT_MS = Number(process.env.LIGHTHOUSE_TIMEOUT_MS ?? 45_000);
 
 /**
  * The runner is copied into the deployment by `outputFileTracingIncludes`.

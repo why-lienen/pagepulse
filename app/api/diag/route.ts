@@ -73,6 +73,39 @@ function runRaw(url: string): Promise<{ stdout: string; stderr: string; code: nu
   });
 }
 
+import { createRequire } from "node:module";
+
+/**
+ * Splits the runner into its two expensive halves so a timeout can be pinned on
+ * Chromium unpacking/launching versus Lighthouse itself.
+ */
+async function stepChrome() {
+  const req = createRequire(path.join(process.cwd(), "node_modules/"));
+  const t0 = Date.now();
+  const chromiumMod = req("@sparticuz/chromium");
+  const chromium = chromiumMod.default ?? chromiumMod;
+  const exePath = await chromium.executablePath();
+  const t1 = Date.now();
+
+  const chromeLauncher = req("chrome-launcher");
+  const flags = (chromium.args ?? []).filter(
+    (flag: string) =>
+      !flag.startsWith("--headless") && flag !== "--single-process" && flag !== "--no-zygote"
+  );
+  const chrome = await chromeLauncher.launch({
+    chromePath: exePath,
+    chromeFlags: [...flags, "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+  });
+  const t2 = Date.now();
+  try {
+    await chrome.kill();
+  } catch {
+    /* ignore */
+  }
+
+  return { exePath, flagCount: flags.length, resolveMs: t1 - t0, launchMs: t2 - t1 };
+}
+
 /**
  * Temporary self-diagnosis endpoint for serverless deployments. Reports where
  * the Lighthouse runner landed and, with ?run=1, actually executes it.
@@ -81,6 +114,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const shouldRun = url.searchParams.get("run") === "1";
   const raw = url.searchParams.get("raw") === "1";
+  const step = url.searchParams.get("step");
   const target = url.searchParams.get("url") ?? "https://example.com/";
 
   const info: Record<string, unknown> = {
@@ -103,6 +137,19 @@ export async function GET(req: Request) {
       timeout: process.env.LIGHTHOUSE_TIMEOUT_MS ?? null,
     },
   };
+
+  if (step === "chrome") {
+    const started = Date.now();
+    try {
+      info.chromeStep = await stepChrome();
+    } catch (err) {
+      info.chromeStep = {
+        error: err instanceof Error ? `${err.message} :: ${(err.stack ?? "").slice(0, 600)}` : String(err),
+        ms: Date.now() - started,
+      };
+    }
+    return NextResponse.json(info, { headers: { "cache-control": "no-store" } });
+  }
 
   if (raw) {
     const out = await runRaw(target);
