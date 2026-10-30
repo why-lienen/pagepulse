@@ -119,10 +119,20 @@ async function launchChrome() {
 }
 
 let chrome = null;
+const startedAt = Date.now();
 
 try {
   const launched = await launchChrome();
   chrome = launched.chrome;
+  const launchMs = Date.now() - startedAt;
+
+  // Diagnostics: report how long it took to unpack and launch the browser, then
+  // stop. Useful when a serverless function is killed before Lighthouse finishes.
+  if (args.includes("--step=chrome")) {
+    emit({ ok: true, chrome: launched.label, launchMs, mode: "chrome-only" });
+    await chrome.kill();
+    process.exit(0);
+  }
 
   const runnerResult = await lighthouse(
     target,

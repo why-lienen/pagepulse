@@ -46,13 +46,19 @@ function dependencyReport(roots: string[]) {
   return { okCount: ok.length, missing };
 }
 
-function runRaw(url: string): Promise<{ stdout: string; stderr: string; code: number | null }> {
+function runRaw(
+  url: string,
+  extraArgs: string[] = []
+): Promise<{ stdout: string; stderr: string; code: number | null; ms: number }> {
   const runner = findRunner();
-  if (!runner) return Promise.resolve({ stdout: "", stderr: "runner not found", code: null });
+  if (!runner) {
+    return Promise.resolve({ stdout: "", stderr: "runner not found", code: null, ms: 0 });
+  }
+  const started = Date.now();
   return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
-    const child = spawn(process.execPath, [runner, url], {
+    const child = spawn(process.execPath, [runner, url, ...extraArgs], {
       cwd: process.cwd(),
       env: { ...process.env, NODE_ENV: "production" },
       stdio: ["ignore", "pipe", "pipe"],
@@ -68,44 +74,20 @@ function runRaw(url: string): Promise<{ stdout: string; stderr: string; code: nu
     child.stderr.on("data", (c: Buffer) => (stderr += c.toString()));
     child.on("close", (code) => {
       clearTimeout(timer);
-      resolve({ stdout: stdout.slice(0, 4000), stderr: stderr.slice(0, 4000), code });
+      resolve({
+        stdout: stdout.slice(0, 4000),
+        stderr: stderr.slice(0, 4000),
+        code,
+        ms: Date.now() - started,
+      });
     });
   });
 }
-
-import { createRequire } from "node:module";
 
 /**
  * Splits the runner into its two expensive halves so a timeout can be pinned on
  * Chromium unpacking/launching versus Lighthouse itself.
  */
-async function stepChrome() {
-  const req = createRequire(path.join(process.cwd(), "node_modules/"));
-  const t0 = Date.now();
-  const chromiumMod = req("@sparticuz/chromium");
-  const chromium = chromiumMod.default ?? chromiumMod;
-  const exePath = await chromium.executablePath();
-  const t1 = Date.now();
-
-  const chromeLauncher = req("chrome-launcher");
-  const flags = (chromium.args ?? []).filter(
-    (flag: string) =>
-      !flag.startsWith("--headless") && flag !== "--single-process" && flag !== "--no-zygote"
-  );
-  const chrome = await chromeLauncher.launch({
-    chromePath: exePath,
-    chromeFlags: [...flags, "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-  });
-  const t2 = Date.now();
-  try {
-    await chrome.kill();
-  } catch {
-    /* ignore */
-  }
-
-  return { exePath, flagCount: flags.length, resolveMs: t1 - t0, launchMs: t2 - t1 };
-}
-
 /**
  * Temporary self-diagnosis endpoint for serverless deployments. Reports where
  * the Lighthouse runner landed and, with ?run=1, actually executes it.
@@ -139,15 +121,7 @@ export async function GET(req: Request) {
   };
 
   if (step === "chrome") {
-    const started = Date.now();
-    try {
-      info.chromeStep = await stepChrome();
-    } catch (err) {
-      info.chromeStep = {
-        error: err instanceof Error ? `${err.message} :: ${(err.stack ?? "").slice(0, 600)}` : String(err),
-        ms: Date.now() - started,
-      };
-    }
+    info.chromeStep = await runRaw(target, ["--step=chrome"]);
     return NextResponse.json(info, { headers: { "cache-control": "no-store" } });
   }
 
