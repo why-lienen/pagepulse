@@ -2,7 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "app/api/audit/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
+    },
+    "app/api/diag/route.ts": {
+      "maxDuration": 300
     },
     "app/api/health/route.ts": {
       "maxDuration": 10

@@ -38,7 +38,15 @@ if (!target) {
   process.exit(0);
 }
 
-const categories = ["performance", "accessibility", "seo", "best-practices"];
+const categoriesArg = args.find((a) => a.startsWith("--cats="));
+const ALL_CATEGORIES = ["performance", "accessibility", "seo", "best-practices"];
+const categories = categoriesArg
+  ? categoriesArg
+      .slice("--cats=".length)
+      .split(",")
+      .map((c) => c.trim())
+      .filter((c) => ALL_CATEGORIES.includes(c))
+  : ALL_CATEGORIES;
 
 const COMMON_FLAGS = [
   "--no-sandbox",
@@ -118,6 +126,9 @@ async function launchChrome() {
   throw new Error(`Could not launch any Chrome build — ${failures.join(" | ")}`);
 }
 
+const throttlingArg = args.find((a) => a.startsWith("--throttling="));
+const throttlingMethod = throttlingArg ? throttlingArg.slice("--throttling=".length) : "simulate";
+
 let chrome = null;
 const startedAt = Date.now();
 
@@ -142,6 +153,7 @@ try {
       logLevel: "error",
       onlyCategories: categories,
       formFactor: "mobile",
+      throttlingMethod,
     },
     undefined
   );

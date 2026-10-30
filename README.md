@@ -154,18 +154,27 @@ Works out of the box on [Vercel](https://vercel.com):
 
 1. Push this repo to GitHub.
 2. Import it on Vercel — the default Next.js preset is correct, no build flags.
-3. Check **Settings → Functions**: Hobby already gives you 1024 MB, which is the
-   practical minimum for Chromium. On Pro bump it to 2048 MB.
-4. Add the env vars above (optional). On the free Hobby plan also set
-   `LIGHTHOUSE_TIMEOUT_MS=45000` so a slow target fails fast instead of being
-   killed by the 60 s function limit.
+3. Nothing else is required: Hobby gives every function 2 GB / 1 vCPU, which is
+   enough to unpack Chromium and run Lighthouse.
+4. Add the env vars above only if you want the AI summary (optional).
 5. Deploy.
 
 Node **22.x** is required: `@sparticuz/chromium` 153 needs `^22.17 || >=24` and
 Lighthouse 13 needs `>=22.19`. `package.json` pins `"node": "22.x"`.
 
-The route already declares `maxDuration = 60`, which is the Hobby ceiling. On Pro
-you can raise it to `300` and drop the timeout override.
+The routes declare `maxDuration = 300`, which is the ceiling on every plan with
+fluid compute (Pro can go to 800). It is generous on purpose: a laptop finishes a
+Lighthouse run in ~15 s, a single-vCPU serverless instance needs ~40-50 s, and
+`LIGHTHOUSE_TIMEOUT_MS` (default 120 s) makes the runner give up before the
+platform kills the request.
+
+### Serverless bundle size
+
+Lighthouse is spawned as a child process, so Next's tracer cannot see its
+imports. `next.config.mjs` walks Lighthouse's dependency graph at build time and
+feeds ~100 package globs to `outputFileTracingIncludes` (164 MB, plus a 67 MB
+Chromium bundle — under the 250 MB function limit). `@sentry/*` and `zod` are
+excluded because only the Lighthouse CLI uses them for crash reporting.
 
 On Vercel the runner picks the bundled `@sparticuz/chromium`, so audits still get
 real Lighthouse scores without an API key. Notes:

@@ -3,11 +3,12 @@ import { enqueueAudit, getJob, queueStats, runAuditInline } from "@/lib/jobs";
 
 export const runtime = "nodejs";
 /**
- * 60 s fits the Vercel Hobby ceiling (10 s default, 60 s max) and is enough for
- * one Lighthouse run, which takes ~15 s. On Vercel Pro raise this to 300 and set
- * LIGHTHOUSE_TIMEOUT_MS accordingly.
+ * With fluid compute (the 2026 default) every plan allows 300 s, Pro up to 800.
+ * A real Lighthouse run takes ~15 s on a laptop but ~45 s on a single-vCPU
+ * serverless instance, so the ceiling has to be generous. Override with
+ * LIGHTHOUSE_TIMEOUT_MS if you want to fail faster.
  */
-export const maxDuration = 60;
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 /** Serverless platforms do not keep this module alive between requests. */

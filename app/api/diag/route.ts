@@ -5,7 +5,7 @@ import path from "node:path";
 import { findRunner, runnerCandidates, runLocalLighthouse } from "@/lib/lighthouseLocal";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 function pkgDirs(): string[] {

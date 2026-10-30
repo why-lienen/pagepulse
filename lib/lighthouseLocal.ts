@@ -24,11 +24,11 @@ const BEGIN = "__LH_BEGIN__";
 const END = "__LH_END__";
 
 /**
- * 45 s by default: serverless functions are capped at 60 s, so a longer budget
- * would just be killed by the platform instead of returning a readable error.
- * A local run takes ~15 s.
+ * 120 s by default: a laptop finishes in ~15 s, a single-vCPU serverless
+ * instance needs ~45 s, and the platform allows 300 s. Kept below the function
+ * ceiling so we can return a readable error instead of a platform timeout.
  */
-const TIMEOUT_MS = Number(process.env.LIGHTHOUSE_TIMEOUT_MS ?? 45_000);
+const TIMEOUT_MS = Number(process.env.LIGHTHOUSE_TIMEOUT_MS ?? 120_000);
 
 /**
  * The runner is copied into the deployment by `outputFileTracingIncludes`.
