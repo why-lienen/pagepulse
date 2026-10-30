@@ -63,6 +63,17 @@ export async function collectPerformance(url: string): Promise<PerfResult> {
 
   const useApi = async (): Promise<PerfResult> => fromPsi(await fetchPageSpeed(url));
 
+  /**
+   * When both engines fail we must not hide the local reason behind the Google
+   * error: "local Lighthouse could not launch Chrome" is the actionable one.
+   */
+  const bothFailed = (local: PerfResult, api: PerfResult): PerfResult => ({
+    ...api,
+    error: [local.error, api.error ? `PageSpeed fallback also failed: ${api.error}` : null]
+      .filter(Boolean)
+      .join(" "),
+  });
+
   if (provider === "pagespeed") {
     const api = await useApi();
     return api.ok || localOff ? api : useLocal();
@@ -72,7 +83,8 @@ export async function collectPerformance(url: string): Promise<PerfResult> {
     if (localOff) return useApi();
     const local = await useLocal();
     if (local.ok || !hasKey) return local;
-    return useApi();
+    const api = await useApi();
+    return api.ok ? api : bothFailed(local, api);
   }
 
   if (hasKey) {
@@ -85,5 +97,5 @@ export async function collectPerformance(url: string): Promise<PerfResult> {
 
   const local = await useLocal();
   if (local.ok) return local;
-  return useApi();
+  return bothFailed(local, await useApi());
 }

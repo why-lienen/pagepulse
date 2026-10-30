@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { resolveProxy } from "./proxy";
 import type { CategoryScore } from "./types";
@@ -24,8 +25,25 @@ const END = "__LH_END__";
 
 const TIMEOUT_MS = Number(process.env.LIGHTHOUSE_TIMEOUT_MS ?? 120_000);
 
-function runnerScript(): string {
-  return path.join(process.cwd(), "scripts", "lighthouse-runner.mjs");
+/**
+ * The runner is copied into the deployment by `outputFileTracingIncludes`.
+ * Where it lands depends on the host, so try every plausible root instead of
+ * trusting `process.cwd()` alone.
+ */
+export function runnerCandidates(): string[] {
+  const roots = new Set<string>([process.cwd()]);
+  // Serverless bundles usually run from /var/task; Next may also keep the file
+  // next to the route output.
+  roots.add("/var/task");
+  roots.add(path.join(process.cwd(), ".next", "server"));
+  return [...roots].map((root) => path.join(root, "scripts", "lighthouse-runner.mjs"));
+}
+
+export function findRunner(): string | null {
+  for (const candidate of runnerCandidates()) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 type RunnerPayload = {
@@ -65,8 +83,16 @@ export async function runLocalLighthouse(url: string): Promise<LocalLighthouseRe
     return failure("Local Lighthouse is disabled (DISABLE_LOCAL_LIGHTHOUSE=1).");
   }
 
+  const runner = findRunner();
+  if (!runner) {
+    return failure(
+      `The Lighthouse runner is missing from this deployment (looked in ${runnerCandidates().join(", ")}). ` +
+        "outputFileTracingIncludes did not copy scripts/lighthouse-runner.mjs."
+    );
+  }
+
   const proxy = await resolveProxy();
-  const args = [runnerScript(), url];
+  const args = [runner, url];
   if (proxy) args.push(`--proxy=${proxy.url}`);
 
   return new Promise<LocalLighthouseResult>((resolve) => {
@@ -115,7 +141,7 @@ export async function runLocalLighthouse(url: string): Promise<LocalLighthouseRe
       const payload = parsePayload(stdout);
 
       if (!payload) {
-        const hint = stderr.trim().split("\n").slice(-3).join(" ").slice(0, 300);
+        const hint = stderr.trim().split("\n").slice(-6).join(" ").slice(0, 800);
         finish(
           failure(
             hint
