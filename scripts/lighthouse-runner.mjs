@@ -88,16 +88,18 @@ async function launchChrome() {
       label: "packaged @sparticuz/chromium (headless shell)",
       getChromePath: async () => {
         const { default: chromium } = await import("@sparticuz/chromium");
-        // --single-process and --no-zygote are fine for simple scraping but make
-        // Lighthouse's multi-tab navigation flaky, so they are dropped. The
-        // packaged build is a headless shell: it must not receive --headless=new.
-        const packagedFlags = chromium.args.filter(
-          (flag) =>
-            !flag.startsWith("--headless") &&
-            flag !== "--single-process" &&
-            flag !== "--no-zygote"
-        );
-        return { chromePath: await chromium.executablePath(), chromeFlags: packagedFlags };
+        // Keep @sparticuz's flags exactly as shipped. Dropping --single-process or
+        // --no-zygote makes Chromium fork helper processes, which the Lambda
+        // sandbox blocks: the browser still starts in ~3 s, but every navigation
+        // hangs until the function is killed (FUNCTION_INVOCATION_TIMEOUT).
+        // The flags also include --headless='shell', which a headless-shell build
+        // needs; adding --headless=new on top of it breaks the launch.
+        // On Docker/VPS set FORCE_MULTI_PROCESS=1 for a more stable Lighthouse.
+        let flags = [...chromium.args];
+        if (process.env.FORCE_MULTI_PROCESS === "1") {
+          flags = flags.filter((flag) => flag !== "--single-process" && flag !== "--no-zygote");
+        }
+        return { chromePath: await chromium.executablePath(), chromeFlags: flags };
       },
     });
   }
@@ -156,6 +158,18 @@ try {
         defaultViewport: { width: 412, height: 823, deviceScaleFactor: 1.75, isMobile: true, hasTouch: true },
       });
       const page = await browser.newPage();
+
+      // Probe with an inline page first: if this succeeds but the real URL does
+      // not, the browser is fine and the network is the problem.
+      const probeStart = Date.now();
+      let probe;
+      try {
+        await page.goto("data:text/html,<h1>ok</h1>", { timeout: 15_000 });
+        probe = { ok: true, ms: Date.now() - probeStart };
+      } catch (err) {
+        probe = { ok: false, ms: Date.now() - probeStart, error: (err && err.message) || String(err) };
+      }
+
       const navStart = Date.now();
       const response = await page.goto(target, { waitUntil: "load", timeout: 45_000 });
       const navMs = Date.now() - navStart;
@@ -210,6 +224,7 @@ try {
       emit({
         ok: true,
         chrome: launched.label,
+        probe,
         status: response ? response.status() : null,
         navMs,
         vitals,

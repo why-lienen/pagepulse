@@ -48,7 +48,8 @@ function dependencyReport(roots: string[]) {
 
 function runRaw(
   url: string,
-  extraArgs: string[] = []
+  extraArgs: string[] = [],
+  budgetMs = 45_000
 ): Promise<{ stdout: string; stderr: string; code: number | null; ms: number }> {
   const runner = findRunner();
   if (!runner) {
@@ -69,7 +70,7 @@ function runRaw(
       } catch {
         /* gone */
       }
-    }, 45_000);
+    }, budgetMs);
     child.stdout.on("data", (c: Buffer) => (stdout += c.toString()));
     child.stderr.on("data", (c: Buffer) => (stderr += c.toString()));
     child.on("close", (code) => {
@@ -121,7 +122,7 @@ export async function GET(req: Request) {
   };
 
   if (step) {
-    info.chromeStep = await runRaw(target, [`--step=${step}`]);
+    info.chromeStep = await runRaw(target, [`--step=${step}`], 120_000);
     return NextResponse.json(info, { headers: { "cache-control": "no-store" } });
   }
 
