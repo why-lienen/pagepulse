@@ -2,6 +2,9 @@
   "name": "pagepulse",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "description": "Open-source AI website auditor — instant performance, SEO and security report with AI-prioritised fixes.",
   "scripts": {
     "dev": "next dev",
