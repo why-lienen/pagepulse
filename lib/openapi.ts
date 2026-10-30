@@ -193,26 +193,26 @@ export const OPENAPI_SPEC: OpenApiSpec = {
       Job: {
         type: "object",
         properties: {
-          id: { type: "string" },
-          url: { type: "string" },
+          id: { type: "string", description: "Job id, poll it with GET /api/audit?id=…" },
+          url: { type: "string", description: "Normalised URL that was audited." },
           status: { type: "string", enum: ["queued", "running", "done", "error"] },
           stage: {
             type: "string",
             enum: ["queued", "fetch", "rules", "lighthouse", "ai", "done"],
           },
           position: { type: ["integer", "null"], description: "1-based queue position." },
-          queueLength: { type: "integer" },
-          running: { type: "integer" },
-          elapsedMs: { type: "integer" },
-          etaSeconds: { type: ["integer", "null"] },
+          queueLength: { type: "integer", description: "Jobs waiting behind this one." },
+          running: { type: "integer", description: "Audits executing right now." },
+          elapsedMs: { type: "integer", description: "Time since the job was created." },
+          etaSeconds: { type: ["integer", "null"], description: "Rough wait estimate." },
           report: { $ref: "#/components/schemas/Report" },
-          error: { type: "string" },
+          error: { type: "string", description: "Safe to show to end users when status is error." },
         },
       },
       QueuedResponse: {
         type: "object",
         properties: {
-          status: { type: "string", const: "queued" },
+          status: { type: "string", const: "queued", description: "Always queued on this response." },
           job: { $ref: "#/components/schemas/Job" },
           queue: { $ref: "#/components/schemas/Queue" },
         },
@@ -220,7 +220,7 @@ export const OPENAPI_SPEC: OpenApiSpec = {
       JobResponse: {
         type: "object",
         properties: {
-          status: { type: "string" },
+          status: { type: "string", description: "Mirrors job.status for convenience." },
           job: { $ref: "#/components/schemas/Job" },
           queue: { $ref: "#/components/schemas/Queue" },
         },
@@ -228,7 +228,7 @@ export const OPENAPI_SPEC: OpenApiSpec = {
       DoneResponse: {
         type: "object",
         properties: {
-          status: { type: "string", const: "done" },
+          status: { type: "string", const: "done", description: "Always done on this response." },
           report: { $ref: "#/components/schemas/Report" },
           queue: { $ref: "#/components/schemas/Queue" },
         },
@@ -239,15 +239,16 @@ export const OPENAPI_SPEC: OpenApiSpec = {
           key: {
             type: "string",
             enum: ["performance", "accessibility", "seo", "best-practices"],
+            description: "Stable identifier.",
           },
-          label: { type: "string" },
+          label: { type: "string", description: "Human-readable name." },
           score: { type: ["integer", "null"], description: "0-100, or null when unmeasured." },
         },
       },
       Issue: {
         type: "object",
         properties: {
-          id: { type: "string" },
+          id: { type: "string", description: "Stable slug, e.g. missing-meta-description." },
           category: {
             type: "string",
             enum: [
@@ -261,7 +262,7 @@ export const OPENAPI_SPEC: OpenApiSpec = {
             ],
           },
           severity: { type: "string", enum: ["critical", "warning", "info", "pass"] },
-          title: { type: "string" },
+          title: { type: "string", description: "One-line summary of the finding." },
           detail: { type: "string", description: "Why it matters." },
           fix: { type: "string", description: "What to change." },
         },
@@ -269,20 +270,35 @@ export const OPENAPI_SPEC: OpenApiSpec = {
       Report: {
         type: "object",
         properties: {
-          url: { type: "string" },
+          url: { type: "string", description: "URL that was requested." },
           finalUrl: { type: "string", description: "URL after redirects." },
           fetchedAt: { type: "string", format: "date-time" },
           overall: { type: "integer", description: "0-100 overall score." },
           grade: { type: "string", description: "A+ · A · B · C · D" },
           scoreBasis: { type: "string", enum: ["lighthouse", "rules"] },
-          lighthouseError: { type: ["string", "null"] },
+          lighthouseError: {
+            type: ["string", "null"],
+            description: "Why Lighthouse produced no numbers, when it failed.",
+          },
           perfSource: {
             type: ["string", "null"],
             enum: ["local-lighthouse", "pagespeed", null],
+            description: "Which engine produced the scores.",
           },
-          perfNote: { type: ["string", "null"] },
-          categories: { type: "array", items: { $ref: "#/components/schemas/CategoryScore" } },
-          issues: { type: "array", items: { $ref: "#/components/schemas/Issue" } },
+          perfNote: {
+            type: ["string", "null"],
+            description: "How performance was measured, in plain language.",
+          },
+          categories: {
+            type: "array",
+            items: { $ref: "#/components/schemas/CategoryScore" },
+            description: "The four Lighthouse categories, in display order.",
+          },
+          issues: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Issue" },
+            description: "Every finding, including the ones that passed.",
+          },
           meta: {
             type: "object",
             properties: {
@@ -327,12 +343,20 @@ export const OPENAPI_SPEC: OpenApiSpec = {
               proposalBlurb: { type: "string" },
             },
           },
-          aiEnabled: { type: "boolean" },
+          aiEnabled: {
+            type: "boolean",
+            description: "True when the deployment has an AI key configured.",
+          },
         },
       },
       Error: {
         type: "object",
-        properties: { error: { type: "string" } },
+        properties: {
+          error: {
+            type: "string",
+            description: "Plain-language reason, safe to show to end users.",
+          },
+        },
       },
     },
     responses: {

@@ -333,7 +333,12 @@ export default function OpenApiPage() {
                 <div className="schema-card" id={`schema-${name}`} key={name}>
                   <div className="schema-head">
                     <code>{name}</code>
-                    <span className="type-chip">{typeLabel(schema)}</span>
+                    <span className="type-chip">
+                      {typeLabel(schema)}
+                      {schema.properties
+                        ? ` · ${Object.keys(schema.properties).length} fields`
+                        : ""}
+                    </span>
                   </div>
                   {schema.description && <p className="docs-p">{schema.description}</p>}
                   <table className="docs-table tbl-props">
