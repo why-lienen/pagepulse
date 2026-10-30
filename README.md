@@ -153,11 +153,16 @@ rejected so the endpoint cannot be used as an SSRF pivot.
 Works out of the box on [Vercel](https://vercel.com):
 
 1. Push this repo to GitHub.
-2. Import it on Vercel.
-3. Set **memory ≥ 1024 MB** for the function and `maxDuration` accordingly
-   (the route already declares `maxDuration = 300`).
-4. Add the env vars above (optional).
+2. Import it on Vercel — the default Next.js preset is correct, no build flags.
+3. Open **Settings → Functions** and set memory to **1024 MB** (`2048 MB` is more
+   comfortable; 512 MB will OOM inside Chromium).
+4. Add the env vars above (optional). On the free Hobby plan also set
+   `LIGHTHOUSE_TIMEOUT_MS=45000` so a slow target fails fast instead of being
+   killed by the 60 s function limit.
 5. Deploy.
+
+The route already declares `maxDuration = 60`, which is the Hobby ceiling. On Pro
+you can raise it to `300` and drop the timeout override.
 
 On Vercel the runner picks the bundled `@sparticuz/chromium`, so audits still get
 real Lighthouse scores without an API key. Notes:
@@ -165,11 +170,15 @@ real Lighthouse scores without an API key. Notes:
 - Function memory matters more than CPU: 1024 MB is the practical minimum,
   2048 MB is comfortable.
 - Cold starts add ~1-2 s while the Chromium bundle is unpacked.
+- The first build is slow (10 min locally) because Next traces the Chromium and
+  Lighthouse bundles. Later builds use the cache.
 - Vercel has no persistent memory between requests, so the queue is bypassed and
   the audit runs inside the request — the API answers `{status:"done", report}`
   instead of a job id, and the client handles both.
-- If you would rather not pay for the larger function, set
-  `DISABLE_LOCAL_LIGHTHOUSE=1` and provide a `PAGESPEED_API_KEY` instead.
+- If the target site is slow, or the function runs out of memory, set
+  `DISABLE_LOCAL_LIGHTHOUSE=1` and provide a `PAGESPEED_API_KEY` instead: the
+  report then uses the Google API and labels its source. Rule checks, the score
+  and the proposal snippet keep working with no browser at all.
 
 Docker / a VPS is the cheapest way to run it at volume: install Chrome (or let the
 bundled Chromium handle it), then `npm run build && npm start` with

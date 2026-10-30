@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { enqueueAudit, getJob, queueStats, runAuditInline } from "@/lib/jobs";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+/**
+ * 60 s fits the Vercel Hobby ceiling (10 s default, 60 s max) and is enough for
+ * one Lighthouse run, which takes ~15 s. On Vercel Pro raise this to 300 and set
+ * LIGHTHOUSE_TIMEOUT_MS accordingly.
+ */
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 /** Serverless platforms do not keep this module alive between requests. */
