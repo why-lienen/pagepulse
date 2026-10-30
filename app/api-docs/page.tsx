@@ -228,9 +228,9 @@ HTTP/1.1 400 Bad Request
             <span className="chip">No auth</span>
             <span className="chip">JSON in / JSON out</span>
             <span className="chip">MIT licensed</span>
-            <a className="chip chip-link" href="/openapi.json" target="_blank" rel="noreferrer">
+            <Link className="chip chip-link" href="/openapi">
               OpenAPI 3.1 <ExternalIcon size={12} />
-            </a>
+            </Link>
           </div>
         </header>
 
@@ -458,7 +458,9 @@ HTTP/1.1 400 Bad Request
             <a href={REPO_URL} target="_blank" rel="noreferrer">
               GitHub
             </a>
-            <a href="/openapi.json">OpenAPI</a>
+            <a href="/openapi.json" target="_blank" rel="noreferrer">
+              openapi.json
+            </a>
             <Link href="/">Home</Link>
           </div>
         </div>

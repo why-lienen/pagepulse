@@ -8,7 +8,11 @@ No signup. No database. Reports are generated live and never stored.
 
 - **Source:** <https://github.com/why-lienen/pagepulse>
 - **JSON API docs:** `GET /api-docs` — every endpoint, field and error code
-- **OpenAPI 3.1:** `GET /openapi.json` — import into Postman, Insomnia, or generate a client
+- **OpenAPI 3.1 viewer:** `GET /openapi` — the whole contract rendered as a page
+- **OpenAPI 3.1 file:** `GET /openapi.json` — import into Postman, Insomnia, or generate a client
+
+Both OpenAPI pages are generated from the same object in `lib/openapi.ts`, so the
+rendered contract and the machine-readable file cannot drift apart.
 
 ---
 
@@ -100,10 +104,10 @@ queueing — the client handles both shapes transparently.
 
 ## HTTP API
 
-Human-readable docs live at **`/api-docs`**, the machine-readable spec at
-**`/openapi.json`**, and a liveness probe at **`/api/health`**. Opening
-`/api/audit` in a browser without an id returns a self-describing JSON index
-instead of an error.
+Human-readable docs live at **`/api-docs`**, the rendered OpenAPI contract at
+**`/openapi`**, the machine-readable spec at **`/openapi.json`**, and a liveness
+probe at **`/api/health`**. Opening `/api/audit` in a browser without an id
+returns a self-describing JSON index instead of an error.
 
 ```bash
 # start an audit (queue mode)

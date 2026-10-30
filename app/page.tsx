@@ -113,9 +113,7 @@ export default function HomePage() {
             <span className="dot-sep">·</span>
             <Link href="/api-docs">JSON API docs</Link>
             <span className="dot-sep">·</span>
-            <a href="/openapi.json" target="_blank" rel="noreferrer">
-              OpenAPI
-            </a>
+            <Link href="/openapi">OpenAPI 3.1</Link>
           </div>
         </section>
 
@@ -164,9 +162,7 @@ export default function HomePage() {
               GitHub
             </a>
             <Link href="/api-docs">JSON API</Link>
-            <a href="/openapi.json" target="_blank" rel="noreferrer">
-              OpenAPI
-            </a>
+            <Link href="/openapi">OpenAPI</Link>
             <a href="#audit">Run an audit</a>
           </div>
         </div>
