@@ -261,6 +261,36 @@ try {
       scores[key] = typeof score === "number" ? Math.round(score * 100) : null;
     }
 
+    // The packaged headless shell produces no filmstrip, so the speed-index
+    // audit errors out and Lighthouse refuses to score the performance
+    // category at all (it comes back null). Re-weight the metrics that did
+    // pass, using Lighthouse's own category weights, so the number stays
+    // comparable instead of silently disappearing.
+    if (scores.performance === null && lhr.audits) {
+      const weights = {
+        "first-contentful-paint": 0.1,
+        "largest-contentful-paint": 0.25,
+        "total-blocking-time": 0.3,
+        "cumulative-layout-shift": 0.25,
+        "speed-index": 0.1,
+      };
+      let weighted = 0;
+      let total = 0;
+      for (const [id, weight] of Object.entries(weights)) {
+        const auditScore = lhr.audits[id]?.score;
+        if (typeof auditScore === "number") {
+          weighted += auditScore * weight;
+          total += weight;
+        }
+      }
+      if (total > 0) scores.performance = Math.round((weighted / total) * 100);
+    }
+
+    const auditErrors = {};
+    for (const [id, audit] of Object.entries(lhr.audits ?? {})) {
+      if (audit && audit.errorMessage) auditErrors[id] = String(audit.errorMessage).slice(0, 140);
+    }
+
     const metricMap = {
       LCP: "largest-contentful-paint",
       CLS: "cumulative-layout-shift",
@@ -281,6 +311,7 @@ try {
       metrics,
       chrome: launched.label,
       finalUrl: lhr.finalDisplayedUrl ?? target,
+      ...(Object.keys(auditErrors).length ? { auditErrors } : {}),
     });
   }
 } catch (err) {
