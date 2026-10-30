@@ -120,8 +120,8 @@ export async function GET(req: Request) {
     },
   };
 
-  if (step === "chrome") {
-    info.chromeStep = await runRaw(target, ["--step=chrome"]);
+  if (step) {
+    info.chromeStep = await runRaw(target, [`--step=${step}`]);
     return NextResponse.json(info, { headers: { "cache-control": "no-store" } });
   }
 

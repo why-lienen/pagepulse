@@ -145,6 +145,84 @@ try {
     process.exit(0);
   }
 
+  // Diagnostics: navigate with puppeteer and collect Core Web Vitals directly.
+  // Tells apart "the browser or network is broken" from "Lighthouse hangs".
+  if (args.includes("--step=nav") || args.includes("--step=cwv")) {
+    const stepStarted = Date.now();
+    try {
+      const { default: puppeteer } = await import("puppeteer-core");
+      const browser = await puppeteer.connect({
+        browserURL: `http://127.0.0.1:${chrome.port}`,
+        defaultViewport: { width: 412, height: 823, deviceScaleFactor: 1.75, isMobile: true, hasTouch: true },
+      });
+      const page = await browser.newPage();
+      const navStart = Date.now();
+      const response = await page.goto(target, { waitUntil: "load", timeout: 45_000 });
+      const navMs = Date.now() - navStart;
+
+      const vitals = await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const out = { lcp: 0, cls: 0, fcp: 0, tbt: 0, lcpElement: null };
+            try {
+              const fcp = performance.getEntriesByName("first-contentful-paint")[0];
+              if (fcp) out.fcp = Math.round(fcp.startTime);
+              const nav = performance.getEntriesByType("navigation")[0];
+              if (nav) out.ttfb = Math.round(nav.responseStart);
+            } catch {
+              /* ignore */
+            }
+            try {
+              new PerformanceObserver((list) => {
+                const entries = list.getEntries();
+                const last = entries[entries.length - 1];
+                if (last) {
+                  out.lcp = Math.round(last.startTime);
+                  out.lcpElement = last.element ? last.element.tagName : null;
+                }
+              }).observe({ type: "largest-contentful-paint", buffered: true });
+            } catch {
+              /* ignore */
+            }
+            try {
+              new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                  if (!entry.hadRecentInput) out.cls = Math.round((out.cls + entry.value) * 1000) / 1000;
+                }
+              }).observe({ type: "layout-shift", buffered: true });
+            } catch {
+              /* ignore */
+            }
+            try {
+              new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                  out.tbt += Math.max(0, entry.duration - 50);
+                }
+                out.tbt = Math.round(out.tbt);
+              }).observe({ type: "longtask", buffered: true });
+            } catch {
+              /* ignore */
+            }
+            setTimeout(() => resolve(out), 3000);
+          })
+      );
+
+      emit({
+        ok: true,
+        chrome: launched.label,
+        status: response ? response.status() : null,
+        navMs,
+        vitals,
+        totalMs: Date.now() - stepStarted,
+      });
+      await browser.disconnect();
+    } catch (err) {
+      emit({ ok: false, error: (err && err.message) || String(err), totalMs: Date.now() - stepStarted });
+    }
+    await chrome.kill();
+    process.exit(0);
+  }
+
   const runnerResult = await lighthouse(
     target,
     {
