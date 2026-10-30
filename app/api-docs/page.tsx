@@ -402,8 +402,8 @@ HTTP/1.1 400 Bad Request
         <section className="docs-section" id="limits">
           <h2>Limits</h2>
           <p className="docs-p">
-            A Lighthouse run costs about 15 seconds and a few hundred megabytes, so the public instance
-            is deliberately conservative. All of it is configurable when you self-host.
+            A Lighthouse run costs 10-20 seconds and a few hundred megabytes, so the public
+            instance is deliberately conservative. All of it is configurable when you self-host.
           </p>
           <table className="docs-table">
             <thead>

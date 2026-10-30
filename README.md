@@ -176,6 +176,31 @@ feeds ~100 package globs to `outputFileTracingIncludes` (164 MB, plus a 67 MB
 Chromium bundle — under the 250 MB function limit). `@sentry/*` and `zod` are
 excluded because only the Lighthouse CLI uses them for crash reporting.
 
+### What actually happens on Vercel (measured)
+
+| Step | Time |
+|---|---|
+| Unpack + launch the packaged Chromium | ~3 s |
+| Lighthouse on `example.com` (100 / 96 / 80 / 100) | ~9 s |
+| Full audit incl. fetch + 40 rule checks | ~11 s |
+| A heavy real-world site (LCP 14.5 s) | ~18 s |
+
+Two traps worth knowing, both found the hard way:
+
+- **Never strip `--single-process` / `--no-zygote`** from `chromium.args` on
+  Lambda. Without them Chromium forks helper processes, the sandbox blocks the
+  fork, and every navigation hangs silently until the function is killed — the
+  browser still *launches* in 3 s, which makes it look like a Lighthouse problem.
+  `FORCE_MULTI_PROCESS=1` is for Docker/VPS only.
+- **The headless shell renders no filmstrip**, so Lighthouse's `speed-index`
+  audit errors out and the whole performance category comes back `null`. The
+  runner re-weights the four metrics that do pass (FCP .1, LCP .25, TBT .3,
+  CLS .25) so the number survives instead of disappearing.
+
+Set `ENABLE_DIAG=1` to expose `/api/diag` (404 by default): it reports where the
+runner and the Chrome packages landed, and `?run=1` / `?step=chrome` execute them
+with timings.
+
 On Vercel the runner picks the bundled `@sparticuz/chromium`, so audits still get
 real Lighthouse scores without an API key. Notes:
 

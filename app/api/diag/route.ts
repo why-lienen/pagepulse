@@ -94,6 +94,12 @@ function runRaw(
  * the Lighthouse runner landed and, with ?run=1, actually executes it.
  */
 export async function GET(req: Request) {
+  // Self-check endpoint, off by default. Set ENABLE_DIAG=1 in the deployment to
+  // inspect where the runner landed and how long Chromium takes to start.
+  if (process.env.ENABLE_DIAG !== "1") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const url = new URL(req.url);
   const shouldRun = url.searchParams.get("run") === "1";
   const raw = url.searchParams.get("raw") === "1";
